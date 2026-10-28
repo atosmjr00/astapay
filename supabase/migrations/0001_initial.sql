@@ -13,7 +13,7 @@ alter table public.orders enable row level security;
 alter table public.payout_requests enable row level security;
 alter table public.audit_logs enable row level security;
 create policy "profile owner reads own profile" on public.profiles for select to authenticated using (auth.uid() = id);
-create policy "profile owner updates own profile" on public.profiles for update to authenticated using (auth.uid() = id) with check (auth.uid() = id);
+-- Sensitive profile fields (CPF, KYC status and Pix key) must only be changed by trusted server-side code.
 create policy "seller reads own products" on public.products for select to authenticated using (auth.uid() = seller_id);
 create policy "seller creates own products" on public.products for insert to authenticated with check (auth.uid() = seller_id);
 create policy "seller updates own products" on public.products for update to authenticated using (auth.uid() = seller_id) with check (auth.uid() = seller_id);
