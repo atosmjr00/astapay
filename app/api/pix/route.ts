@@ -111,10 +111,23 @@ export async function POST(request: Request) {
 
     const raw = await gatewayResponse.text();
     let gateway: NomapayPixResponse;
-    try { gateway = JSON.parse(raw) as NomapayPixResponse; }
-    catch {
+    try {
+      gateway = JSON.parse(raw) as NomapayPixResponse;
+    } catch {
+      const contentType = gatewayResponse.headers.get("content-type") || "unknown";
+      // Log only a short response excerpt for diagnosis; never log API credentials.
+      console.error("[NOMAPAY] Non-JSON response", {
+        httpStatus: gatewayResponse.status,
+        contentType,
+        bodyPreview: raw.replace(/\s+/g, " ").slice(0, 240),
+      });
       await supabase.from("orders").update({ status: "cancelled" }).eq("id", order.id).eq("status", "pending");
-      return NextResponse.json({ error: "Resposta inválida do gateway." }, { status: 502 });
+      return NextResponse.json({
+        error: "A NOMAPAY retornou uma resposta que não é JSON.",
+        code: "GATEWAY_NON_JSON",
+        gatewayStatus: gatewayResponse.status,
+        gatewayContentType: contentType,
+      }, { status: 502 });
     }
 
     const transactionId = gateway.transaction_id || gateway.id;
