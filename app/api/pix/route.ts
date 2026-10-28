@@ -117,11 +117,18 @@ export async function POST(request: Request) {
       gateway = JSON.parse(raw) as NomapayPixResponse;
     } catch {
       const contentType = gatewayResponse.headers.get("content-type") || "unknown";
-      // Log only a short response excerpt for diagnosis; never log API credentials.
+      // Diagnostic metadata only: never log API credentials or customer data.
       console.error("[NOMAPAY] Non-JSON response", {
         httpStatus: gatewayResponse.status,
         contentType,
-        bodyPreview: raw.replace(/\s+/g, " ").slice(0, 240),
+        server: gatewayResponse.headers.get("server") || "unknown",
+        cfRay: gatewayResponse.headers.get("cf-ray") || null,
+        requestId:
+          gatewayResponse.headers.get("x-request-id") ||
+          gatewayResponse.headers.get("x-trace-id") ||
+          gatewayResponse.headers.get("traceparent") ||
+          null,
+        bodyPreview: raw.replace(/\s+/g, " ").slice(0, 500),
       });
       await supabase.from("orders").update({ status: "cancelled" }).eq("id", order.id).eq("status", "pending");
       return NextResponse.json({
