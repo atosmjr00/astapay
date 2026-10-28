@@ -5,20 +5,28 @@ Painel Next.js responsivo para uma plataforma de vendas com checkout Pix e taxa 
 ## Rodar localmente
 
 1. Instale Node.js 20+.
-2. Copie `.env.example` para `.env.local` e preencha as variáveis do Supabase.
+2. Copie `.env.example` para `.env.local` e preencha as variáveis.
 3. Execute `npm install` e `npm run dev`.
-4. Aplique `supabase/migrations/0001_initial.sql` no projeto Supabase.
+4. Aplique, em ordem, `supabase/migrations/0001_initial.sql` e `supabase/migrations/0002_nomapay_checkout.sql` no projeto Supabase.
+5. Configure no painel NOMAPAY o webhook público `https://SEU-DOMINIO/api/webhooks/nomapay` e coloque o segredo dedicado `whsec_...` em `NOMAPAY_WEBHOOK_SECRET`.
 
-## Estado real do projeto
+## O que está implementado no backend
 
-O painel atual é uma demonstração de interface; o cadastro de produtos ainda é local no navegador. A rota Pix exige sessão Supabase e valida o produto no servidor, mas permanece deliberadamente bloqueada: a documentação NOMAPAY fornecida não foi possível de verificar nesta sessão e o contrato de autenticação, endpoint, payload e assinatura do webhook ainda precisa ser confirmado. Não configure credenciais live nem aceite pagamentos até concluir esse adaptador, deduplicação/idempotência, conciliação e testes em sandbox.
+- Rota `POST /api/pix`: consulta preço no banco (não confia no valor enviado pelo navegador), cria pedido, chama `POST https://nomaofficial.com.br/api/v1/transactions`, usa chave de idempotência e devolve o Pix.
+- Rota `POST /api/webhooks/nomapay`: verifica HMAC-SHA256 sobre o corpo bruto, compara a assinatura em tempo constante, registra delivery IDs para deduplicação e só marca pedido como pago quando o ID e o valor em centavos correspondem ao pedido.
+- Cliente administrativo do Supabase isolado em módulo server-only; a chave service-role nunca deve ser exposta ao browser.
+- Migration para idempotência e armazenamento de eventos recebidos.
 
-## Segurança antes do lançamento
+## Importante: ainda não é lançamento de produção
 
-- Nunca commitar segredos. Use variáveis de ambiente no servidor.
-- Rotacionar imediatamente qualquer chave privada que tenha sido publicada ou enviada a repositórios.
-- Implementar login, verificação de e-mail, KYC com aprovação manual e auditoria.
-- Criptografar CPF e chave Pix em repouso; não devolver esses campos ao navegador.
-- Implementar webhook com validação de assinatura, idempotência e conferência de valor/ordem.
-- Implementar ledger financeiro imutável, reserva de saldo, antifraude, limites e aprovação de saques.
-- Validar requisitos legais, LGPD, regras do provedor de pagamentos e termos de uso.
+A interface do painel continua sendo uma demonstração: cadastro de produtos local no navegador, sem fluxo completo de autenticação, persistência de catálogo, aprovação KYC, ledger financeiro, saques ou notificações de venda. O backend Pix foi integrado conforme a especificação NOMAPAY colada no projeto, mas ainda precisa de teste ponta a ponta em ambiente controlado, revisão de segurança e confirmação do comportamento real do gateway.
+
+Antes de aceitar dinheiro real:
+- Configure somente segredos válidos no ambiente de servidor; nunca os commite.
+- Faça testes de sandbox para cobrança, timeout, repetição da mesma chave de idempotência, webhook duplicado/fora de ordem, divergência de valor e indisponibilidade do banco.
+- Garanta que pedidos com resposta perdida do gateway possam ser reconciliados sem duplicar cobrança.
+- Implemente rate limiting e proteção contra abuso no checkout.
+- Implemente autenticação, verificação de e-mail, KYC com aprovação manual e auditoria.
+- Criptografe CPF e chaves Pix em repouso; mantenha apenas o hash de documento quando possível.
+- Implemente ledger imutável, saldo disponível/reservado, conciliação e aprovação de saques. Não use apenas o status de um pedido como fonte do saldo do vendedor.
+- Valide requisitos legais, LGPD, regras do provedor de pagamentos e termos de uso.
