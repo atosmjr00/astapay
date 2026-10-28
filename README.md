@@ -1,32 +1,33 @@
 # AstaPay
 
-Painel Next.js responsivo para uma plataforma de vendas com checkout Pix e taxa de plataforma planejada de R$ 0,50 por venda.
+Plataforma de vendas com painel autenticado, catálogo persistente e checkout Pix via NOMAPAY. A taxa de R$ 0,50 por venda está registrada como configuração inicial do produto; a liquidação financeira/ledger e os saques ainda precisam ser concluídos antes de usar essa taxa como saldo real.
 
-## Rodar localmente
+## Configuração
 
-1. Instale Node.js 20+.
-2. Copie `.env.example` para `.env.local` e preencha as variáveis.
-3. Execute `npm install` e `npm run dev`.
-4. Aplique, em ordem, `supabase/migrations/0001_initial.sql` e `supabase/migrations/0002_nomapay_checkout.sql` no projeto Supabase.
-5. Configure no painel NOMAPAY o webhook público `https://SEU-DOMINIO/api/webhooks/nomapay` e coloque o segredo dedicado `whsec_...` em `NOMAPAY_WEBHOOK_SECRET`.
+1. Node.js 20 ou superior.
+2. Copie `.env.example` para `.env.local` e preencha os valores do Supabase e NOMAPAY no servidor.
+3. Rode `npm install` e `npm run dev`.
+4. Execute as migrations SQL no Supabase, nesta ordem: `0001_initial.sql`, `0002_nomapay_checkout.sql`, `0003_auth_profiles.sql`.
+5. Em Supabase Auth, configure URL do site e URLs de redirecionamento e escolha se a confirmação de e-mail será obrigatória.
+6. Registre o webhook `https://SEU-DOMINIO/api/webhooks/nomapay` no gateway e configure o segredo dedicado `whsec_...` em `NOMAPAY_WEBHOOK_SECRET`.
+7. Configure `APP_URL` com a origem HTTPS pública da aplicação.
 
-## O que está implementado no backend
+## Funcionalidades no código
 
-- Rota `POST /api/pix`: consulta preço no banco (não confia no valor enviado pelo navegador), cria pedido, chama `POST https://nomaofficial.com.br/api/v1/transactions`, usa chave de idempotência e devolve o Pix.
-- Rota `POST /api/webhooks/nomapay`: verifica HMAC-SHA256 sobre o corpo bruto, compara a assinatura em tempo constante, registra delivery IDs para deduplicação e só marca pedido como pago quando o ID e o valor em centavos correspondem ao pedido.
-- Cliente administrativo do Supabase isolado em módulo server-only; a chave service-role nunca deve ser exposta ao browser.
-- Migration para idempotência e armazenamento de eventos recebidos.
+- Cadastro e login com Supabase Auth, logout e sessão por cookie.
+- Criação e persistência de produtos por vendedor; publicação/despublicação e link público `/checkout/[slug]`.
+- Checkout público com preço lido no banco, criação de pedido e chamada `POST /api/v1/transactions` na NOMAPAY com valores em centavos.
+- Webhook com HMAC-SHA256 sobre o corpo bruto, comparação em tempo constante, deduplicação de delivery ID e conciliação de valor antes de confirmar um pedido.
+- Painel de vendas e resumo financeiro baseados em pedidos no banco.
+- Chaves de servidor separadas da configuração pública.
 
-## Importante: ainda não é lançamento de produção
+## Limitações antes de produção
 
-A interface do painel continua sendo uma demonstração: cadastro de produtos local no navegador, sem fluxo completo de autenticação, persistência de catálogo, aprovação KYC, ledger financeiro, saques ou notificações de venda. O backend Pix foi integrado conforme a especificação NOMAPAY colada no projeto, mas ainda precisa de teste ponta a ponta em ambiente controlado, revisão de segurança e confirmação do comportamento real do gateway.
+O código foi atualizado, mas este ambiente não conseguiu executar `npm install` ou `npm run build` contra o repositório remoto; o CI deve confirmar o build. Ainda são necessários testes reais controlados com NOMAPAY/Supabase e revisão do contrato de webhook.
 
-Antes de aceitar dinheiro real:
-- Configure somente segredos válidos no ambiente de servidor; nunca os commite.
-- Faça testes de sandbox para cobrança, timeout, repetição da mesma chave de idempotência, webhook duplicado/fora de ordem, divergência de valor e indisponibilidade do banco.
-- Garanta que pedidos com resposta perdida do gateway possam ser reconciliados sem duplicar cobrança.
-- Implemente rate limiting e proteção contra abuso no checkout.
-- Implemente autenticação, verificação de e-mail, KYC com aprovação manual e auditoria.
-- Criptografe CPF e chaves Pix em repouso; mantenha apenas o hash de documento quando possível.
-- Implemente ledger imutável, saldo disponível/reservado, conciliação e aprovação de saques. Não use apenas o status de um pedido como fonte do saldo do vendedor.
-- Valide requisitos legais, LGPD, regras do provedor de pagamentos e termos de uso.
+- O cadastro de usuário e o catálogo precisam ser testados após aplicar as três migrations.
+- O fluxo de pagamento deve ser validado em sandbox ou com cobrança de valor baixo autorizada pelo proprietário da conta.
+- Falta ledger imutável e conciliação financeira de taxas/saldos, KYC e aprovação manual, pedidos de saque, antifraude, rate limiting, política de privacidade/termos e fluxo de reembolso.
+- Configure proteção contra abuso no checkout. Não trate apenas o status do pedido como saldo disponível.
+- Em falhas/timeout após enviar uma cobrança, reconcilie a transação no gateway antes de tentar criar outra.
+- Não comite segredos e não compartilhe a service-role key. Rotacione qualquer chave privada que tenha sido publicada anteriormente.
