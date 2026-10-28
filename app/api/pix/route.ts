@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       if (orderError?.code === "23505") {
         const { data: existing } = await supabase.from("orders")
           .select("id,status,pix_code,expires_at,amount_cents")
-          .eq("idempotency_key", idempotencyKey).maybeSingle();
+          .eq("seller_id", product.seller_id).eq("idempotency_key", idempotencyKey).maybeSingle();
         if (existing) return NextResponse.json({
           orderId: existing.id, status: existing.status, pixCopyPaste: existing.pix_code,
           expiresAt: existing.expires_at, amountCents: existing.amount_cents,
