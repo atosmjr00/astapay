@@ -8,8 +8,8 @@ const schema = z.object({
   customer: z.object({
     name: z.string().trim().min(2).max(120),
     email: z.email().trim().max(254),
-    phone: z.string().trim().max(24).optional(),
-    cpf: z.string().trim().optional(),
+    phone: z.string().trim().min(8).max(24),
+    cpf: z.string().trim().min(11).max(18),
   }),
 });
 export const runtime = "nodejs";
@@ -53,14 +53,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Chave de idempotência inválida." }, { status: 400 });
     }
     const cpf = parsed.data.customer.cpf?.replace(/\D/g, "");
-    if (cpf && cpf.length !== 11) return NextResponse.json({ error: "CPF inválido." }, { status: 400 });
+    if (!cpf || cpf.length !== 11) return NextResponse.json({ error: "Informe um CPF válido com 11 dígitos." }, { status: 400 });
+    const phone = parsed.data.customer.phone.replace(/\D/g, "");
+    if (phone.length < 10 || phone.length > 13) return NextResponse.json({ error: "Informe um celular válido com DDD." }, { status: 400 });
 
     const { data: order, error: orderError } = await supabase.from("orders").insert({
       product_id: product.id,
       seller_id: product.seller_id,
       customer_name: parsed.data.customer.name,
       customer_email: parsed.data.customer.email.toLowerCase(),
-      customer_document_hash: cpf ? createHash("sha256").update(cpf).digest("hex") : null,
+      customer_document_hash: createHash("sha256").update(cpf).digest("hex"),
       amount_cents: product.price_cents,
       platform_fee_cents: 50,
       status: "pending",
@@ -87,8 +89,8 @@ export async function POST(request: Request) {
       name: parsed.data.customer.name,
       email: parsed.data.customer.email.toLowerCase(),
     };
-    if (parsed.data.customer.phone) customer.phone = parsed.data.customer.phone.replace(/\D/g, "");
-    if (cpf) customer.document = { number: cpf, type: "CPF" };
+    customer.phone = phone;
+    customer.document = { number: cpf, type: "CPF" };
 
     const auth = Buffer.from(`${publicKey}:${secretKey}`).toString("base64");
     const gatewayResponse = await fetch("https://nomaofficial.com.br/api/v1/transactions", {
