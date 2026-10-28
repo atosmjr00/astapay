@@ -248,12 +248,12 @@ export default function CheckoutPage() {
                   />
                 </label>
                 <label style={{ display: "grid", gap: 7, fontSize: 13 }}>
-                  Celular (opcional)
-                  <input value={phone} onChange={(event) => setPhone(event.target.value)} style={field} />
+                  Celular com DDD
+                  <input required minLength={10} maxLength={15} type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} style={field} />
                 </label>
                 <label style={{ display: "grid", gap: 7, fontSize: 13 }}>
-                  CPF (opcional)
-                  <input value={cpf} onChange={(event) => setCpf(event.target.value)} style={field} />
+                  CPF
+                  <input required minLength={11} maxLength={14} inputMode="numeric" value={cpf} onChange={(event) => setCpf(event.target.value)} style={field} />
                 </label>
                 {error && <p style={{ color: "#f87171", fontSize: 13 }}>{error}</p>}
                 <button disabled={busy} style={button}>
